@@ -216,7 +216,9 @@ static std::string _localizer = "velodyne";
 static std::string _offset = "linear";  // linear, zero, quadratic
 
 static ros::Publisher ndt_reliability_pub;
+static ros::Publisher ndt_trans_probability_pub;
 static std_msgs::Float32 ndt_reliability;
+static std_msgs::Float32 ndt_trans_probability;
 
 static bool _get_height = false;
 static bool _use_local_transform = false;
@@ -1415,6 +1417,8 @@ static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
     ndt_reliability.data = Wa * (exe_time / 100.0) * 100.0 + Wb * (iteration / 10.0) * 100.0 +
                            Wc * ((2.0 - trans_probability) / 2.0) * 100.0;
     ndt_reliability_pub.publish(ndt_reliability);
+    ndt_trans_probability.data = trans_probability;
+    ndt_trans_probability_pub.publish(ndt_trans_probability);
 
     // Write log
     if(_output_log_data)
@@ -1440,26 +1444,26 @@ static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
       }
     }
 
-    std::cout << "-----------------------------------------------------------------" << std::endl;
-    std::cout << "Sequence: " << input->header.seq << std::endl;
-    std::cout << "Timestamp: " << input->header.stamp << std::endl;
-    std::cout << "Frame ID: " << input->header.frame_id << std::endl;
-    //    std::cout << "Number of Scan Points: " << scan_ptr->size() << " points." << std::endl;
-    std::cout << "Number of Filtered Scan Points: " << scan_points_num << " points." << std::endl;
-    std::cout << "NDT has converged: " << has_converged << std::endl;
-    std::cout << "Fitness Score: " << fitness_score << std::endl;
-    std::cout << "Transformation Probability: " << trans_probability << std::endl;
-    std::cout << "Execution Time: " << exe_time << " ms." << std::endl;
-    std::cout << "Number of Iterations: " << iteration << std::endl;
-    std::cout << "NDT Reliability: " << ndt_reliability.data << std::endl;
-    std::cout << "(x,y,z,roll,pitch,yaw): " << std::endl;
-    std::cout << "(" << current_pose.x << ", " << current_pose.y << ", " << current_pose.z << ", " << current_pose.roll
-              << ", " << current_pose.pitch << ", " << current_pose.yaw << ")" << std::endl;
-    std::cout << "Transformation Matrix: " << std::endl;
-    std::cout << t << std::endl;
-    std::cout << "Align time: " << align_time << std::endl;
-    std::cout << "Get fitness score time: " << getFitnessScore_time << std::endl;
-    std::cout << "-----------------------------------------------------------------" << std::endl;
+    // std::cout << "-----------------------------------------------------------------" << std::endl;
+    // std::cout << "Sequence: " << input->header.seq << std::endl;
+    // std::cout << "Timestamp: " << input->header.stamp << std::endl;
+    // std::cout << "Frame ID: " << input->header.frame_id << std::endl;
+    // //    std::cout << "Number of Scan Points: " << scan_ptr->size() << " points." << std::endl;
+    // std::cout << "Number of Filtered Scan Points: " << scan_points_num << " points." << std::endl;
+    // std::cout << "NDT has converged: " << has_converged << std::endl;
+    // std::cout << "Fitness Score: " << fitness_score << std::endl;
+    // std::cout << "Transformation Probability: " << trans_probability << std::endl;
+    // std::cout << "Execution Time: " << exe_time << " ms." << std::endl;
+    // std::cout << "Number of Iterations: " << iteration << std::endl;
+    // std::cout << "NDT Reliability: " << ndt_reliability.data << std::endl;
+    // std::cout << "(x,y,z,roll,pitch,yaw): " << std::endl;
+    // std::cout << "(" << current_pose.x << ", " << current_pose.y << ", " << current_pose.z << ", " << current_pose.roll
+    //           << ", " << current_pose.pitch << ", " << current_pose.yaw << ")" << std::endl;
+    // std::cout << "Transformation Matrix: " << std::endl;
+    // std::cout << t << std::endl;
+    // std::cout << "Align time: " << align_time << std::endl;
+    // std::cout << "Get fitness score time: " << getFitnessScore_time << std::endl;
+    // std::cout << "-----------------------------------------------------------------" << std::endl;
 
     offset_imu_x = 0.0;
     offset_imu_y = 0.0;
@@ -1663,6 +1667,7 @@ int main(int argc, char** argv)
   time_ndt_matching_pub = nh.advertise<std_msgs::Float32>("/time_ndt_matching", 10);
   ndt_stat_pub = nh.advertise<autoware_msgs::NDTStat>("/ndt_stat", 10);
   ndt_reliability_pub = nh.advertise<std_msgs::Float32>("/ndt_reliability", 10);
+  ndt_trans_probability_pub = nh.advertise<std_msgs::Float32>("/ndt_trans_probability", 10);
 
   // Subscribers
   ros::Subscriber param_sub = nh.subscribe("config/ndt", 10, param_callback);
