@@ -4,8 +4,18 @@
 #include "Registration.h"
 #include "VoxelGrid.h"
 #include <eigen3/Eigen/Geometry>
+#include <map>
+#include <cmath>
 
 namespace cpu {
+struct voxelscore {
+  voxelscore(): id(-1), score(0.0){}
+  int  id;
+  double score;
+};
+
+// std::map<int, std::vector<double>> vidDict_;
+std::vector<voxelscore> badvoxel_;
 
 template <typename PointSourceType, typename PointTargetType>
 class NormalDistributionsTransform: public Registration<PointSourceType, PointTargetType> {
@@ -105,7 +115,7 @@ private:
   double trans_probability_;
 
   int real_iterations_;
-
+  float untrusted_rate;
 
   VoxelGrid<PointSourceType> voxel_grid_;
 };

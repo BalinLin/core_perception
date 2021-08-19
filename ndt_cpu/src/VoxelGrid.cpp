@@ -206,6 +206,12 @@ int VoxelGrid<PointSourceType>::getVgridZ() const
 }
 
 template <typename PointSourceType>
+Octree<PointSourceType> VoxelGrid<PointSourceType>::getOctree() const
+{
+  return octree_;
+}
+
+template <typename PointSourceType>
 Eigen::Vector3d VoxelGrid<PointSourceType>::getCentroid(int voxel_id) const
 {
   return (*centroid_)[voxel_id];

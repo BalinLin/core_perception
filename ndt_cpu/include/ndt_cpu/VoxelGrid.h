@@ -52,6 +52,8 @@ public:
   int getVgridY() const;
   int getVgridZ() const;
 
+  Octree<PointSourceType> getOctree() const;
+
   void setLeafSize(float voxel_x, float voxel_y, float voxel_z);
 
   /* Searching for the nearest point of each input query point.
@@ -59,6 +61,7 @@ public:
    * If the distance is larger than max_range, then return DBL_MAX. */
 
   double nearestNeighborDistance(PointSourceType query_point, float max_range);
+  int nearestVoxel(PointSourceType query_point, Eigen::Matrix<float, 6, 1> boundaries, float max_range);
 
   Eigen::Vector3d getCentroid(int voxel_id) const;
   Eigen::Matrix3d getCovariance(int voxel_id) const;
@@ -106,8 +109,6 @@ private:
               float min_x, float min_y, float min_z);
 
   void updateVoxelContent(typename pcl::PointCloud<PointSourceType>::Ptr new_cloud);
-
-  int nearestVoxel(PointSourceType query_point, Eigen::Matrix<float, 6, 1> boundaries, float max_range);
 
   int roundUp(int input, int factor);
 
