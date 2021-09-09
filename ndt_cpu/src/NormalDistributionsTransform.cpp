@@ -29,7 +29,6 @@ NormalDistributionsTransform<PointSourceType, PointTargetType>::NormalDistributi
   transformation_epsilon_ = 0.1;
   max_iterations_ = 35;
   real_iterations_ = 0;
-  untrusted_rate = 0.5;
 }
 
 template <typename PointSourceType, typename PointTargetType>
@@ -201,26 +200,25 @@ double NormalDistributionsTransform<PointSourceType, PointTargetType>::computeDe
   Eigen::Matrix<double, 3, 6> point_gradient;
   Eigen::Matrix<double, 18, 6> point_hessian;
   double score = 0;
+  int untrustedSize = std::round(badvoxel_.size() * untrusted_rate);
 
   point_gradient.setZero();
   point_gradient.block<3, 3>(0, 0).setIdentity();
   point_hessian.setZero();
-  // std::cout << "len: " << vidDict.size() << std::endl;
-  // std::cout << voxel_grid_.getVoxelNum() << std::endl;
   for (int idx = 0; idx < source_cloud_->points.size(); idx++) {
     neighbor_ids.clear();
     x_trans_pt = trans_cloud.points[idx];
 
     voxel_grid_.radiusSearch(x_trans_pt, resolution_, neighbor_ids);
 
+    // if it is untrusted voxel then continue
+    // only consider the first "untrusted_rate" part of ordered "badvoxel_" and the score > "untrusted_score"
     for (int i = 0; i < neighbor_ids.size(); i++) {
-      // bool same = false;
       bool bad = false;
       int vid = neighbor_ids[i];
-      for (int it = 0; it < badvoxel_.size(); ++it)
+      for (int it = 0; (it < untrustedSize) && (badvoxel_[it].score > untrusted_score); ++it)
       {
         if (vid == badvoxel_[it].id){
-          // std::cout << "computeDerivatives continue: " << vid << " bad: " << badvoxel_[it].id << std::endl;
           bad = true;
           break;
         } 
@@ -234,32 +232,10 @@ double NormalDistributionsTransform<PointSourceType, PointTargetType>::computeDe
       x = Eigen::Vector3d(x_pt.x, x_pt.y, x_pt.z);
 
       Eigen::Vector3d centroid = voxel_grid_.getCentroid(vid);
-      std::vector<double> centroidvector = {centroid(0), centroid(1), centroid(2)};
       x_trans = Eigen::Vector3d(x_trans_pt.x, x_trans_pt.y, x_trans_pt.z);
       x_trans -= centroid;
       c_inv = voxel_grid_.getInverseCovariance(vid);
 
-      // same vid will get same centroid
-      // if(vidDict.find(vid) != vidDict.end())
-      // {
-      //   for (int v = 0; v < vidDict[vid].size(); v++)
-      //   {
-      //     // std::cout << "vid: " << vid << std::endl;
-      //     // std::cout << vidDict[vid][0] << vidDict[vid][1] << vidDict[vid][2] << std::endl;
-      //     // std::cout << centroidvector[0] << centroidvector[1] << centroidvector[2] << std::endl;
-      //     if (vidDict[vid] == centroidvector)
-      //       // std::cout << "TRUE" << std::endl;
-      //       same = true;
-      //   }
-      //   if(!same){
-      //     std::cout << same << std::endl;
-      //   }
-      // }
-      // else
-      // {
-      //   vidDict[vid] = centroidvector;
-      // }
-      
       computePointDerivatives(x, point_gradient, point_hessian, compute_hessian);
 
       score += updateDerivatives(score_gradient, hessian, point_gradient, point_hessian, x_trans, c_inv, compute_hessian);
@@ -727,7 +703,7 @@ void NormalDistributionsTransform<PointSourceType, PointTargetType>::computeHess
 
   Eigen::Matrix<double, 3, 6> point_gradient;
   Eigen::Matrix<double, 18, 6> point_hessian;
-
+  int untrustedSize = std::round(badvoxel_.size() * untrusted_rate);
 
   for (int idx = 0; idx < source_cloud_->points.size(); idx++) {
     x_trans_pt = trans_cloud.points[idx];
@@ -735,14 +711,15 @@ void NormalDistributionsTransform<PointSourceType, PointTargetType>::computeHess
     std::vector<int> neighbor_ids;
 
     voxel_grid_.radiusSearch(x_trans_pt, resolution_, neighbor_ids);
-
+    
+    // if it is untrusted voxel then continue
+    // only consider the first "untrusted_rate" part of ordered "badvoxel_" and the score > "untrusted_score"
     for (int i = 0; i < neighbor_ids.size(); i++) {
       bool bad = false;
       int vid = neighbor_ids[i];
-      for (int it = 0; it < badvoxel_.size(); ++it)
+      for (int it = 0; (it < untrustedSize) && (badvoxel_[it].score > untrusted_score); ++it)
       {
         if (vid == badvoxel_[it].id){
-          // std::cout << "computeDerivatives continue: " << vid << " bad: " << badvoxel_[it].id << std::endl;
           bad = true;
           break;
         } 
@@ -800,6 +777,7 @@ double NormalDistributionsTransform<PointSourceType, PointTargetType>::getFitnes
       nr++;
       
       // score of each voxel
+      // vidscore = <vid, (count, score)>
       if(vidscore.find(nn_vid) != vidscore.end())
       {
         vidscore[nn_vid][0] += 1;
@@ -813,36 +791,22 @@ double NormalDistributionsTransform<PointSourceType, PointTargetType>::getFitnes
     }
   }
 
-  std::vector<voxelscore> badvoxel(std::round(vidscore.size() * untrusted_rate)); // <vid, avg score>
-  // Find the max "n" big score and store in badvoxel.
-  // vidscore: <vid, (count, score)>, badvoxel: <vid, avg score>
+  
+  // Calculate avg score of each vid.
+  // vidscore: <vid, (count, score)>, vidscoreAvg: <vid, avg score>
+  std::vector<voxelscore> vidscoreAvg(vidscore.size()); // <vid, avg score>
+  int idx = 0;
   for (std::map<int, std::vector<double>>::iterator it = vidscore.begin(); it != vidscore.end(); ++it)
   {
-    double bad_id = it->first;
-    double bad_val = it->second[1] / it->second[0];
-    // int minElementIndex = std::min_element(v.begin(),v.end()) - v.begin();
-    int minElementIndex = -1;
-    voxelscore minIdScore;
-    minIdScore.id = bad_id;
-    minIdScore.score = bad_val;
-
-    for (int it = 0; it < badvoxel.size(); ++it)
-    {
-      if (minIdScore.score > badvoxel[it].score)
-      {
-        minElementIndex = it;
-        minIdScore.score = badvoxel[it].score;
-      }
-      // std::cout << "minElementIndex:" << minElementIndex << std::endl;
-      if (minElementIndex != -1)
-      {
-        badvoxel[minElementIndex].id = bad_id;
-        badvoxel[minElementIndex].score = bad_val;
-      }
-    }
+    double bad_id = it->first; // vid
+    double bad_val = it->second[1] / it->second[0]; // avg score
+    vidscoreAvg[idx].id = bad_id;
+    vidscoreAvg[idx].score = bad_val;
+    idx++;
   }
+  std::sort(vidscoreAvg.begin(), vidscoreAvg.end(), compareVoxelScore); // sort vidscore by "score"
 
-  badvoxel_ = badvoxel;
+  badvoxel_ = vidscoreAvg;
   // std::cout << "size: " << badvoxel_.size() << std::endl;
   // std::cout << "val:" << std::endl;
   // for (int it = 0; it < badvoxel_.size(); ++it)
@@ -851,8 +815,6 @@ double NormalDistributionsTransform<PointSourceType, PointTargetType>::getFitnes
   // }
   // std::cout << std::endl;
   
-  // Eigen::Vector3d c = voxel_grid_.getCentroid(-1);
-  // std::cout << "c: " << c(0) << " " << c(1) << " " << c(2) << std::endl;
 
   if (nr > 0) {
     return (fitness_score / nr);

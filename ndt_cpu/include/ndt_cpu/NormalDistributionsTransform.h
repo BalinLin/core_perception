@@ -13,9 +13,13 @@ struct voxelscore {
   int  id;
   double score;
 };
+bool compareVoxelScore(const voxelscore &a, const voxelscore &b){
+  return a.score > b.score;
+}
 
-// std::map<int, std::vector<double>> vidDict_;
 std::vector<voxelscore> badvoxel_;
+float untrusted_rate = 0.5; // untrusted rate of all voxel
+float untrusted_score = 5.0; // untrusted score threshold
 
 template <typename PointSourceType, typename PointTargetType>
 class NormalDistributionsTransform: public Registration<PointSourceType, PointTargetType> {
@@ -115,7 +119,6 @@ private:
   double trans_probability_;
 
   int real_iterations_;
-  float untrusted_rate;
 
   VoxelGrid<PointSourceType> voxel_grid_;
 };
