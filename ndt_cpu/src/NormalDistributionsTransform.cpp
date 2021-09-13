@@ -200,7 +200,6 @@ double NormalDistributionsTransform<PointSourceType, PointTargetType>::computeDe
   Eigen::Matrix<double, 3, 6> point_gradient;
   Eigen::Matrix<double, 18, 6> point_hessian;
   double score = 0;
-  int untrustedSize = std::round(badvoxel_.size() * untrusted_rate);
 
   point_gradient.setZero();
   point_gradient.block<3, 3>(0, 0).setIdentity();
@@ -210,20 +209,13 @@ double NormalDistributionsTransform<PointSourceType, PointTargetType>::computeDe
     x_trans_pt = trans_cloud.points[idx];
 
     voxel_grid_.radiusSearch(x_trans_pt, resolution_, neighbor_ids);
-
-    // if it is untrusted voxel then continue
-    // only consider the first "untrusted_rate" part of ordered "badvoxel_" and the score > "untrusted_score"
+    
     for (int i = 0; i < neighbor_ids.size(); i++) {
-      bool bad = false;
       int vid = neighbor_ids[i];
-      for (int it = 0; (it < untrustedSize) && (badvoxel_[it].score > untrusted_score); ++it)
-      {
-        if (vid == badvoxel_[it].id){
-          bad = true;
-          break;
-        } 
-      }
-      if(bad == true)
+
+      // if it is untrusted voxel then continue
+      // only consider the score > "untrusted_score"
+      if (badvoxel_[vid] > untrusted_score)
       {
         continue;
       }
@@ -703,7 +695,6 @@ void NormalDistributionsTransform<PointSourceType, PointTargetType>::computeHess
 
   Eigen::Matrix<double, 3, 6> point_gradient;
   Eigen::Matrix<double, 18, 6> point_hessian;
-  int untrustedSize = std::round(badvoxel_.size() * untrusted_rate);
 
   for (int idx = 0; idx < source_cloud_->points.size(); idx++) {
     x_trans_pt = trans_cloud.points[idx];
@@ -712,22 +703,16 @@ void NormalDistributionsTransform<PointSourceType, PointTargetType>::computeHess
 
     voxel_grid_.radiusSearch(x_trans_pt, resolution_, neighbor_ids);
     
-    // if it is untrusted voxel then continue
-    // only consider the first "untrusted_rate" part of ordered "badvoxel_" and the score > "untrusted_score"
     for (int i = 0; i < neighbor_ids.size(); i++) {
-      bool bad = false;
       int vid = neighbor_ids[i];
-      for (int it = 0; (it < untrustedSize) && (badvoxel_[it].score > untrusted_score); ++it)
-      {
-        if (vid == badvoxel_[it].id){
-          bad = true;
-          break;
-        } 
-      }
-      if(bad == true)
+
+      // if it is untrusted voxel then continue
+      // only consider the score > "untrusted_score"
+      if (badvoxel_[vid] > untrusted_score)
       {
         continue;
       }
+      
       x_pt = source_cloud_->points[idx];
       x = Eigen::Vector3d(x_pt.x, x_pt.y, x_pt.z);
       x_trans = Eigen::Vector3d(x_trans_pt.x, x_trans_pt.y, x_trans_pt.z);
@@ -793,27 +778,35 @@ double NormalDistributionsTransform<PointSourceType, PointTargetType>::getFitnes
 
   
   // Calculate avg score of each vid.
-  // vidscore: <vid, (count, score)>, vidscoreAvg: <vid, avg score>
-  std::vector<voxelscore> vidscoreAvg(vidscore.size()); // <vid, avg score>
-  int idx = 0;
+  // vidscore: <vid, (count, score)>
   for (std::map<int, std::vector<double>>::iterator it = vidscore.begin(); it != vidscore.end(); ++it)
   {
     double bad_id = it->first; // vid
     double bad_val = it->second[1] / it->second[0]; // avg score
-    vidscoreAvg[idx].id = bad_id;
-    vidscoreAvg[idx].score = bad_val;
-    idx++;
-  }
-  std::sort(vidscoreAvg.begin(), vidscoreAvg.end(), compareVoxelScore); // sort vidscore by "score"
 
-  badvoxel_ = vidscoreAvg;
+    if(badvoxel_.find(bad_id) != badvoxel_.end())
+    {
+      badvoxel_[bad_id] = ema * bad_val + (1 - ema) * badvoxel_[bad_id]; // temporal ema
+    }
+    else
+    {
+      badvoxel_[bad_id] = bad_val;
+    }
+  }
+
+  // int biggerOne = 0;
+  // float avg = 0;
   // std::cout << "size: " << badvoxel_.size() << std::endl;
   // std::cout << "val:" << std::endl;
-  // for (int it = 0; it < badvoxel_.size(); ++it)
+  // for (std::map<int, double>::iterator it = badvoxel_.begin(); it != badvoxel_.end(); ++it)
   // {
-  //   std::cout << badvoxel_[it].score << " ";
+  //   // std::cout << it->second << " ";
+  //   if (it->second >= 1) biggerOne++;
+  //   avg += it->second;
   // }
-  // std::cout << std::endl;
+  // std::cout << "Avg: " << avg / badvoxel_.size() << std::endl;
+  // std::cout << "biggerOne: " << biggerOne << std::endl;
+  // // std::cout << std::endl;
   
 
   if (nr > 0) {

@@ -8,18 +8,10 @@
 #include <cmath>
 
 namespace cpu {
-struct voxelscore {
-  voxelscore(): id(-1), score(0.0){}
-  int  id;
-  double score;
-};
-bool compareVoxelScore(const voxelscore &a, const voxelscore &b){
-  return a.score > b.score;
-}
 
-std::vector<voxelscore> badvoxel_;
-float untrusted_rate = 0.5; // untrusted rate of all voxel
-float untrusted_score = 5.0; // untrusted score threshold
+std::map<int, double> badvoxel_; // badvoxel dictionary <id, score>
+float untrusted_score = 1.0; // untrusted score threshold
+float ema = 1; //decay rate
 
 template <typename PointSourceType, typename PointTargetType>
 class NormalDistributionsTransform: public Registration<PointSourceType, PointTargetType> {
