@@ -11,7 +11,7 @@ namespace cpu {
 
 std::map<int, double> badvoxel_; // badvoxel dictionary <id, score>
 float untrusted_score = 1.0; // untrusted score threshold
-float ema = 1; //decay rate
+float ema = 0.8; //decay rate
 
 template <typename PointSourceType, typename PointTargetType>
 class NormalDistributionsTransform: public Registration<PointSourceType, PointTargetType> {
