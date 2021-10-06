@@ -8,8 +8,13 @@
 #include <cmath>
 
 namespace cpu {
-
-std::map<int, double> badvoxel_; // badvoxel dictionary <id, score>
+struct countScore
+{
+  countScore(): count(0), score(0.0){}
+  int count;
+  float score;
+};
+std::map<int, float> badvoxel_; // badvoxel dictionary <id, score>
 float untrusted_score = 1.0; // untrusted score threshold
 float ema = 0.8; //decay rate
 

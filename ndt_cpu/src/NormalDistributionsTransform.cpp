@@ -215,7 +215,7 @@ double NormalDistributionsTransform<PointSourceType, PointTargetType>::computeDe
 
       // if it is untrusted voxel then continue
       // only consider the score > "untrusted_score"
-      if (badvoxel_[vid] > untrusted_score)
+      if (badvoxel_.find(vid) != badvoxel_.end() &&badvoxel_[vid] > untrusted_score)
       {
         continue;
       }
@@ -708,7 +708,7 @@ void NormalDistributionsTransform<PointSourceType, PointTargetType>::computeHess
 
       // if it is untrusted voxel then continue
       // only consider the score > "untrusted_score"
-      if (badvoxel_[vid] > untrusted_score)
+      if (badvoxel_.find(vid) != badvoxel_.end() && badvoxel_[vid] > untrusted_score)
       {
         continue;
       }
@@ -739,7 +739,7 @@ double NormalDistributionsTransform<PointSourceType, PointTargetType>::getFitnes
 
   double distance;
   int nr = 0;
-  std::map<int, std::vector<double>> vidscore; // <vid, (count, score)>
+  std::map<int, countScore> vidscore; // <vid, (count, score)>
 
   for (int i = 0; i < trans_cloud.points.size(); i++) {
     PointSourceType q = trans_cloud.points[i];
@@ -765,34 +765,42 @@ double NormalDistributionsTransform<PointSourceType, PointTargetType>::getFitnes
       // vidscore = <vid, (count, score)>
       if(vidscore.find(nn_vid) != vidscore.end())
       {
-        vidscore[nn_vid][0] += 1;
-        vidscore[nn_vid][1] += distance;
+        vidscore[nn_vid].count += 1;
+        vidscore[nn_vid].score += distance;
       }
       else
       {
-        std::vector<double> cvector = {1, distance};
+        countScore cvector;
+        cvector.count = 1;
+        cvector.score = distance;
         vidscore[nn_vid] = cvector;
       }
     }
   }
-
   
   // Calculate avg score of each vid.
   // vidscore: <vid, (count, score)>
-  for (std::map<int, std::vector<double>>::iterator it = vidscore.begin(); it != vidscore.end(); ++it)
+  std::map<int, float> badvoxel_temp; // temp badvoxel dictionary <id, score>
+  for (std::map<int, countScore>::iterator it = vidscore.begin(); it != vidscore.end(); ++it)
   {
-    double bad_id = it->first; // vid
-    double bad_val = it->second[1] / it->second[0]; // avg score
+    int bad_id = it->first; // vid
+    float bad_val = it->second.score / it->second.count; // avg score
+    badvoxel_temp[bad_id] = bad_val;
+  }
+  vidscore.clear();
+
+  for (std::map<int, float>::iterator it = badvoxel_temp.begin(); it != badvoxel_temp.end(); ++it)
+  {
+    int bad_id = it->first; // vid
+    float bad_val = it->second; // avg score
 
     if(badvoxel_.find(bad_id) != badvoxel_.end())
     {
-      badvoxel_[bad_id] = ema * bad_val + (1 - ema) * badvoxel_[bad_id]; // temporal ema
-    }
-    else
-    {
-      badvoxel_[bad_id] = bad_val;
+      badvoxel_temp[bad_id] = ema * bad_val + (1 - ema) * badvoxel_[bad_id]; // temporal ema
     }
   }
+  badvoxel_ = badvoxel_temp;
+  badvoxel_temp.clear();
 
   // int biggerOne = 0;
   // float avg = 0;
